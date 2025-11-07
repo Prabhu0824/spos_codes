@@ -1,0 +1,113 @@
+chit(2) code:
+import java.util.*;
+public class Pass2Assembler {
+    static class Sym { String name; int addr; Sym(String n, int a){ name=n; addr=a; } }
+    static class Lit { String lit; int addr; Lit(String l, int a){ lit=l; addr=a; } }
+
+    public static void main(String[] args){
+        Map<Integer,Sym> SYMTAB = Map.of(
+            1,new Sym("X",214),
+            2,new Sym("L1",202),
+            3,new Sym("NEXT",207),
+            4,new Sym("BACK",202)
+        );
+        Map<Integer,Lit> LITTAB = Map.of(
+            1,new Lit("='5'",205),
+            2,new Lit("='2'",206),
+            3,new Lit("='1'",210),
+            4,new Lit("='2'",211),
+            5,new Lit("='4'",215)
+        );
+
+        String[] IC = {
+            "(AD,01) (C,200)",
+            "(IS,04) 1 (L,1)",
+            "(IS,05) 1 (S,1)",
+            "(IS,04) 2 (L,2)",
+            "(AD,03) (S,2)+3",
+            "(AD,05)",
+            "(L,1)",
+            "(L,2)",
+            "(IS,01) 1 (L,3)",
+            "(IS,02) 2 (L,4)",
+            "(IS,07) 1(S,4)",
+            "(AD,05)",
+            "(L,3)",
+            "(L,4)",
+            "(AD,04) (S,2)",
+            "(IS,03) 3 (L,5)",
+            "(IS,00)",
+            "(DL,02) (C,1)",
+            "(AD,02)"
+        };
+
+        int LC = 0;
+        List<String> mc = new ArrayList<>();
+
+        for(String line : IC){
+            line=line.trim();
+            if(line.isEmpty()) continue;
+
+            if(line.startsWith("(AD,01)")){ // START
+                LC = Integer.parseInt(line.replaceAll(".*\\(C,","").replaceAll("\\).*",""));
+                continue;
+            }
+            if(line.startsWith("(AD,02)")) break;
+            if(line.startsWith("(AD,03)")){ // ORIGIN
+                String expr = line.substring(line.indexOf("(S,"));
+                if(expr.contains("+")){
+                    String base = expr.substring(3,expr.indexOf(')'));
+                    int offset = Integer.parseInt(expr.substring(expr.indexOf('+')+1));
+                    LC = SYMTAB.get(Integer.parseInt(base)).addr + offset;
+                }
+                continue;
+            }
+            if(line.startsWith("(AD,05)")||line.startsWith("(AD,04)")) continue;
+
+            if(line.startsWith("(DL,01)")){
+                int val = Integer.parseInt(line.replaceAll(".*\\(C,","").replaceAll("\\).*",""));
+                mc.add(String.format("%03d  00  0  %03d",LC,val));
+                LC++;
+                continue;
+            }
+            if(line.startsWith("(DL,02)")){
+                int size = Integer.parseInt(line.replaceAll(".*\\(C,","").replaceAll("\\).*",""));
+                LC+=size;
+                continue;
+            }
+
+            if(line.startsWith("(IS,")){
+                String[] parts = line.split("\\s+");
+                int opcode = Integer.parseInt(parts[0].substring(4,parts[0].length()-1));
+                String reg="0"; int mem=0;
+                if(parts.length==3){
+                    reg=parts[1];
+                    mem=resolve(parts[2],SYMTAB,LITTAB);
+                } else if(parts.length==2){
+                    mem=resolve(parts[1],SYMTAB,LITTAB);
+                }
+                mc.add(String.format("%03d  %02d  %s  %03d",LC,opcode,reg,mem));
+                LC++;
+            }
+        }
+
+        System.out.println("=== MACHINE CODE ===");
+        for(String s:mc) System.out.println(s);
+    }
+
+    static int resolve(String op, Map<Integer,Sym> SYMTAB, Map<Integer,Lit> LITTAB){
+        op=op.trim();
+        if(op.startsWith("(S,")){
+            int idx=Integer.parseInt(op.substring(3,op.length()-1));
+            return SYMTAB.get(idx).addr;
+        }
+        if(op.startsWith("(L,")){
+            int idx=Integer.parseInt(op.substring(3,op.length()-1));
+            return LITTAB.get(idx).addr;
+        }
+        if(op.startsWith("(C,")){
+            return Integer.parseInt(op.replaceAll("[^0-9]",""));
+        }
+        return 0;
+    }
+}

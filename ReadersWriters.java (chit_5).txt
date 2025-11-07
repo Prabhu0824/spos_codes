@@ -1,0 +1,89 @@
+// ReadersWriters.java
+import java.util.concurrent.locks.*;
+
+public class ReadersWriters {
+    static class RWLock {
+        private final ReentrantLock lock = new ReentrantLock();
+        private final Condition readersOk = lock.newCondition();
+        private final Condition writersOk = lock.newCondition();
+        private int readers = 0;
+        private boolean writer = false;
+        private int waitingWriters = 0;
+
+        void acquireRead(int id) throws InterruptedException {
+            lock.lock();
+            try {
+                while (writer || waitingWriters > 0) readersOk.await();
+                readers++;
+                System.out.printf("Reader-%d starts reading (readers=%d)%n", id, readers);
+            } finally { lock.unlock(); }
+        }
+
+        void releaseRead(int id) {
+            lock.lock();
+            try {
+                readers--;
+                System.out.printf("Reader-%d done reading (readers=%d)%n", id, readers);
+                if (readers == 0) writersOk.signal();
+            } finally { lock.unlock(); }
+        }
+
+        void acquireWrite(int id) throws InterruptedException {
+            lock.lock();
+            try {
+                waitingWriters++;
+                while (writer || readers > 0) writersOk.await();
+                waitingWriters--;
+                writer = true;
+                System.out.printf("Writer-%d starts writing%n", id);
+            } finally { lock.unlock(); }
+        }
+
+        void releaseWrite(int id) {
+            lock.lock();
+            try {
+                writer = false;
+                System.out.printf("Writer-%d done writing%n", id);
+                if (waitingWriters > 0) writersOk.signal();
+                else readersOk.signalAll();
+            } finally { lock.unlock(); }
+        }
+    }
+
+    public static void main(String[] args) throws Exception {
+        RWLock rw = new RWLock();
+        Thread[] readers = new Thread[3];
+        Thread[] writers = new Thread[2];
+        for (int i=0;i<3;i++) {
+            final int id=i;
+            readers[i] = new Thread(() -> {
+                try {
+                    for (int k=0;k<5;k++) {
+                        Thread.sleep((int)(Math.random()*200));
+                        rw.acquireRead(id);
+                        Thread.sleep(50);
+                        rw.releaseRead(id);
+                    }
+                } catch (Exception e) {}
+            });
+        }
+        for (int i=0;i<2;i++) {
+            final int id=i;
+            writers[i] = new Thread(() -> {
+                try {
+                    for (int k=0;k<3;k++) {
+                        Thread.sleep((int)(Math.random()*300));
+                        rw.acquireWrite(id);
+                        Thread.sleep(100);
+                        rw.releaseWrite(id);
+                    }
+                } catch (Exception e) {}
+            });
+        }
+        for (Thread t: readers) t.start();
+        for (Thread t: writers) t.start();
+        for (Thread t: readers) t.join();
+        for (Thread t: writers) t.join();
+        System.out.println("Readers-Writers finished");
+    }
+}

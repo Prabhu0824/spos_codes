@@ -1,0 +1,90 @@
+import java.util.*;
+
+public class Main {
+    static class Process {
+        String pid;
+        int arrival, burst, priority;
+        int start, completion, turnaround, waiting;
+        boolean done = false;
+
+        Process(String pid, int arrival, int burst, int priority) {
+            this.pid = pid;
+            this.arrival = arrival;
+            this.burst = burst;
+            this.priority = priority;
+        }
+    }
+
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+
+        System.out.print("Enter number of processes: ");
+        int n = sc.nextInt();
+        List<Process> processes = new ArrayList<>();
+
+        for (int i = 0; i < n; i++) {
+            System.out.print("Enter Process ID, Arrival Time, Burst Time, Priority: ");
+            String pid = sc.next();
+            int arrival = sc.nextInt();
+            int burst = sc.nextInt();
+            int priority = sc.nextInt();
+            processes.add(new Process(pid, arrival, burst, priority));
+        }
+
+        int completed = 0, time = 0;
+        double totalTAT = 0, totalWT = 0;
+        List<String> gantt = new ArrayList<>();
+
+        while (completed < n) {
+            Process current = null;
+            int bestPriority = Integer.MAX_VALUE;
+
+            // Find the process with highest priority (lowest number) among arrived and not done
+            for (Process p : processes) {
+                if (!p.done && p.arrival <= time && p.priority < bestPriority) {
+                    bestPriority = p.priority;
+                    current = p;
+                }
+            }
+
+            if (current == null) {
+                gantt.add("Idle");
+                time++;
+                continue;
+            }
+
+            current.start = time;
+            time += current.burst;
+            current.completion = time;
+            current.turnaround = current.completion - current.arrival;
+            current.waiting = current.turnaround - current.burst;
+            current.done = true;
+            gantt.add(current.pid);
+
+            totalTAT += current.turnaround;
+            totalWT += current.waiting;
+            completed++;
+        }
+
+        // Display results
+        System.out.println("\nPID\tArrival\tBurst\tPriority\tStart\tCompletion\tTurnaround\tWaiting");
+        for (Process p : processes) {
+            System.out.printf("%s\t%d\t%d\t%d\t\t%d\t%d\t\t%d\t\t%d%n",
+                    p.pid, p.arrival, p.burst, p.priority, p.start, p.completion, p.turnaround, p.waiting);
+        }
+
+        System.out.printf("%nAverage Turnaround Time: %.2f%n", totalTAT / n);
+        System.out.printf("Average Waiting Time: %.2f%n", totalWT / n);
+
+        // Gantt Chart
+        System.out.println("\nGantt Chart:");
+        System.out.print("0");
+        int t = 0;
+        for (String p : gantt) {
+            if (!p.equals("Idle")) System.out.print(" | " + p);
+            else System.out.print(" | Idle");
+            t++;
+        }
+        System.out.println(" | " + time);
+    }
+}

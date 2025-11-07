@@ -1,0 +1,43 @@
+import java.util.*;
+
+public class BestFitMemoryAllocation {
+    public static void main(String[] args) {
+        int[] memory = {100, 500, 200, 300, 600};   // Memory partitions (in KB)
+        int[] process = {212, 417, 112, 426};       // Process sizes (in KB)
+
+        bestFit(memory, process);
+    }
+
+    public static void bestFit(int[] memory, int[] process) {
+        int[] allocation = new int[process.length];  // stores block index for each process
+        Arrays.fill(allocation, -1); // initialize as not allocated
+
+        // Allocate each process using Best Fit
+        for (int i = 0; i < process.length; i++) {
+            int bestIdx = -1;
+
+            for (int j = 0; j < memory.length; j++) {
+                if (memory[j] >= process[i]) {
+                    if (bestIdx == -1 || memory[j] < memory[bestIdx]) {
+                        bestIdx = j;  // choose the block with least remaining space
+                    }
+                }
+            }
+
+            // If a suitable block found
+            if (bestIdx != -1) {
+                allocation[i] = bestIdx;
+                memory[bestIdx] -= process[i];
+            }
+        }
+
+        // Print result
+        System.out.println("Process No.\tProcess Size\tBlock No.\tRemaining Memory");
+        for (int i = 0; i < process.length; i++) {
+            if (allocation[i] != -1)
+                System.out.println((i + 1) + "\t\t" + process[i] + "\t\t" + (allocation[i] + 1) + "\t\t" + memory[allocation[i]]);
+            else
+                System.out.println((i + 1) + "\t\t" + process[i] + "\t\tNot Allocated\t---");
+        }
+    }
+}

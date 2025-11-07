@@ -1,0 +1,35 @@
+import java.util.*;
+
+public class FIFOPageReplacement {
+    public static void main(String[] args) {
+        int[] pages = {2, 3, 2, 1, 5, 2, 4, 5, 3, 2, 5, 2}; // given reference string
+        int frames = 3;  // number of frames
+        simulateFIFO(pages, frames);
+    }
+
+    public static void simulateFIFO(int[] pages, int frames) {
+        Queue<Integer> memory = new LinkedList<>();
+        int pageFaults = 0;
+
+        System.out.println("Page Reference String: " + Arrays.toString(pages));
+        System.out.println("Number of Frames: " + frames);
+        System.out.println("\nPage\tFrames\t\tPage Fault");
+
+        for (int page : pages) {
+            if (memory.contains(page)) {
+                // No page fault
+                System.out.println(page + "\t" + memory + "\t\tNo");
+            } else {
+                // Page fault occurs
+                pageFaults++;
+                if (memory.size() == frames) {
+                    memory.poll(); // Remove the oldest page
+                }
+                memory.add(page);
+                System.out.println(page + "\t" + memory + "\t\tYes");
+            }
+        }
+
+        System.out.println("\nTotal Page Faults: " + pageFaults);
+    }
+}

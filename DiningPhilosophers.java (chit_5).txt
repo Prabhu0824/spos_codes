@@ -1,0 +1,60 @@
+// DiningPhilosophers.java
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.locks.ReentrantLock;
+
+public class DiningPhilosophers {
+    static class Dining {
+        private final ReentrantLock[] forks;
+        private final Semaphore waiter;
+        private final int n;
+
+        Dining(int n) {
+            this.n = n;
+            forks = new ReentrantLock[n];
+            for (int i = 0; i < n; i++) forks[i] = new ReentrantLock();
+            waiter = new Semaphore(n - 1); // allow at most n-1 philosophers
+        }
+
+        void dine(int i) {
+            try {
+                for (int k = 0; k < 3; k++) {
+                    System.out.println("Philosopher-" + i + " thinking");
+                    Thread.sleep((int) (Math.random() * 200));
+
+                    waiter.acquire(); // request permission
+                    ReentrantLock left = forks[i];
+                    ReentrantLock right = forks[(i + 1) % n];
+
+                    left.lock();
+                    right.lock();
+                    try {
+                        System.out.println("Philosopher-" + i + " eating");
+                        Thread.sleep((int) (Math.random() * 100));
+                    } finally {
+                        right.unlock();
+                        left.unlock();
+                        waiter.release(); // release permission
+                    }
+                }
+                System.out.println("Philosopher-" + i + " finished");
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    public static void main(String[] args) throws Exception {
+        int n = 5;
+        Dining dining = new Dining(n);
+        Thread[] philosophers = new Thread[n];
+
+        for (int i = 0; i < n; i++) {
+            final int id = i;
+            philosophers[i] = new Thread(() -> dining.dine(id));
+            philosophers[i].start();
+        }
+
+        for (Thread t : philosophers) t.join();
+        System.out.println("Dining Philosophers finished");
+    }
+}

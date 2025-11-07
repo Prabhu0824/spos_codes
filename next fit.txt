@@ -1,0 +1,54 @@
+import java.util.*;
+
+public class NextFitMemoryAllocation {
+    public static void main(String[] args) {
+        int[] memory = {100, 500, 200, 300, 600};   // Memory partitions (in KB)
+        int[] process = {212, 417, 112, 426};       // Process sizes (in KB)
+
+        nextFit(memory, process);
+    }
+
+    public static void nextFit(int[] memory, int[] process) {
+        int[] allocation = new int[process.length];  // store block index for each process
+        Arrays.fill(allocation, -1);  // initialize as not allocated
+        int lastAllocatedIndex = 0;   // remember the last allocated block index
+
+        for (int i = 0; i < process.length; i++) {
+            int start = lastAllocatedIndex;
+            boolean allocated = false;
+
+            // Search from last allocated index till end
+            for (int j = start; j < memory.length; j++) {
+                if (memory[j] >= process[i]) {
+                    allocation[i] = j;
+                    memory[j] -= process[i];
+                    lastAllocatedIndex = j;  // update for next process
+                    allocated = true;
+                    break;
+                }
+            }
+
+            // If not allocated, wrap around and search from beginning
+            if (!allocated) {
+                for (int j = 0; j < start; j++) {
+                    if (memory[j] >= process[i]) {
+                        allocation[i] = j;
+                        memory[j] -= process[i];
+                        lastAllocatedIndex = j;
+                        allocated = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Print results
+        System.out.println("Process No.\tProcess Size\tBlock No.\tRemaining Memory");
+        for (int i = 0; i < process.length; i++) {
+            if (allocation[i] != -1)
+                System.out.println((i + 1) + "\t\t" + process[i] + "\t\t" + (allocation[i] + 1) + "\t\t" + memory[allocation[i]]);
+            else
+                System.out.println((i + 1) + "\t\t" + process[i] + "\t\tNot Allocated\t---");
+        }
+    }
+}

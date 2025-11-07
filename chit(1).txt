@@ -1,0 +1,262 @@
+
+chit(1) code
+
+import java.util.*;
+import java.util.regex.*;
+
+/**
+ * Pass1Assembler.java
+ * Pass-I of a two-pass assembler (Java).
+ * Builds SYMTAB, LITTAB, POOLTAB and prints intermediate code.
+ */
+public class Pass1Assembler {
+
+    static class SymEntry {
+        String name;
+        Integer addr;
+        int index;
+        SymEntry(String n, Integer a, int i) { name = n; addr = a; index = i; }
+    }
+
+    static class LitEntry {
+        String lit;
+        Integer addr;
+        LitEntry(String l) { lit = l; addr = null; }
+    }
+
+    static Map<String,String> MOT = new HashMap<>();
+    static Map<String,String> REGS = new HashMap<>();
+    static Set<String> DIRECTIVES = new HashSet<>();
+
+    static {
+        MOT.put("STOP","00");
+        MOT.put("ADD","01");
+        MOT.put("SUB","02");
+        MOT.put("MULT","03");
+        MOT.put("MOVER","04");
+        MOT.put("MOVEM","05");
+        MOT.put("BC","06");
+
+        REGS.put("AREG","1");
+        REGS.put("BREG","2");
+        REGS.put("CREG","3");
+        REGS.put("DREG","4");
+
+        DIRECTIVES.addAll(Arrays.asList("START","END","ORIGIN","LTORG","EQU","DS","DC"));
+    }
+
+    public static void main(String[] args) {
+        String source = String.join("\n",
+            "START 200",
+            "MOVER AREG, ='5'",
+            "MOVEM AREG, X",
+            "L1 MOVER BREG, ='2'",
+            "ORIGIN L1+3",
+            "LTORG",
+            "NEXT ADD AREG, ='1'",
+            "SUB BREG, ='2'",
+            "BC LT, BACK",
+            "LTORG",
+            "BACK EQU L1",
+            "ORIGIN NEXT+5",
+            "MULT CREG, ='4'",
+            "STOP",
+            "X DS 1",
+            "END"
+        );
+
+        String[] lines = source.split("\\r?\\n");
+        Map<String, SymEntry> SYMTAB = new LinkedHashMap<>();
+        List<LitEntry> LITTAB = new ArrayList<>();
+        List<Integer> POOLTAB = new ArrayList<>(); // 1-based lit indices
+
+        List<String> intermediate = new ArrayList<>();
+        int LC = 0;
+        boolean started = false;
+
+        for (int i=0;i<lines.length;i++) {
+            String line = lines[i].trim();
+            if (line.isEmpty()) continue;
+            String[] parts = line.split("\\s+");
+            String label = null;
+            List<String> tokens = new ArrayList<>(Arrays.asList(parts));
+
+            // label detection heuristic
+            if (tokens.size() > 1 && !MOT.containsKey(tokens.get(0).toUpperCase()) && !DIRECTIVES.contains(tokens.get(0).toUpperCase())) {
+                label = tokens.remove(0);
+                if (!SYMTAB.containsKey(label)) {
+                    SYMTAB.put(label, new SymEntry(label, started ? LC : null, SYMTAB.size()+1));
+                } else {
+                    if (started) SYMTAB.get(label).addr = LC;
+                }
+            }
+            if (tokens.isEmpty()) continue;
+            String op = tokens.remove(0).toUpperCase();
+
+            if (op.equals("START")) {
+                if (!tokens.isEmpty()) LC = Integer.parseInt(tokens.get(0));
+                started = true;
+                intermediate.add(String.format("    (AD,01) (C,%d)", LC));
+                continue;
+            }
+            if (op.equals("END")) {
+                // flush literal pool
+                if (!POOLTAB.isEmpty()) {
+                    int poolStart = POOLTAB.get(POOLTAB.size()-1) - 1; // zero-based
+                    while (poolStart < LITTAB.size()) {
+                        if (LITTAB.get(poolStart).addr == null) {
+                            LITTAB.get(poolStart).addr = LC++;
+                        }
+                        poolStart++;
+                    }
+                }
+                intermediate.add("    (AD,02)");
+                break;
+            }
+            if (op.equals("ORIGIN")) {
+                String expr = tokens.get(0);
+                int val = evalExpr(expr, SYMTAB);
+                LC = val;
+                intermediate.add(String.format("    (AD,03) (C,%d)", LC));
+                continue;
+            }
+            if (op.equals("LTORG")) {
+                if (POOLTAB.isEmpty()) POOLTAB.add(1);
+                int poolStart = POOLTAB.get(POOLTAB.size()-1) - 1;
+                while (poolStart < LITTAB.size()) {
+                    if (LITTAB.get(poolStart).addr == null) {
+                        LITTAB.get(poolStart).addr = LC++;
+                    }
+                    poolStart++;
+                }
+                // find next unassigned literal to start new pool
+                Integer nextPool = null;
+                for (int k=0;k<LITTAB.size();k++) {
+                    if (LITTAB.get(k).addr == null) { nextPool = k+1; break; }
+                }
+                if (nextPool != null) POOLTAB.add(nextPool);
+                intermediate.add("    (AD,05)");
+                continue;
+            }
+            if (op.equals("EQU")) {
+                if (label == null) throw new RuntimeException("EQU without label");
+                String expr = tokens.get(0);
+                int val = evalExpr(expr, SYMTAB);
+                SYMTAB.get(label).addr = val;
+                intermediate.add(String.format("    (AD,04) %s=(C,%d)", label, val));
+                continue;
+            }
+            if (op.equals("DS") || op.equals("DC")) {
+                int size = Integer.parseInt(tokens.get(0));
+                if (label == null) throw new RuntimeException(op + " without label");
+                SYMTAB.get(label).addr = LC;
+                if (op.equals("DS")) {
+                    intermediate.add(String.format("%03d  (DL,02) (C,%d)", LC, size));
+                    LC += size;
+                } else {
+                    intermediate.add(String.format("%03d  (DL,01) (C,%d)", LC, size));
+                    LC += 1;
+                }
+                continue;
+            }
+            // Instruction
+            if (MOT.containsKey(op)) {
+                String code = MOT.get(op);
+                StringBuilder sb = new StringBuilder();
+                sb.append(String.format("%03d  (IS,%s)", LC, code));
+                // reconstruct remaining operand string
+                String opndStr = String.join(" ", tokens);
+                if (!opndStr.isEmpty()) {
+                    // split by commas
+                    String[] ops = opndStr.split(",");
+                    for (String o : ops) {
+                        String operand = o.trim();
+                        if (REGS.containsKey(operand.toUpperCase())) {
+                            sb.append(" (RG,").append(REGS.get(operand.toUpperCase())).append(")");
+                        } else if (operand.matches("^=('.+'|\\d+)$")) {
+                            // literal
+                            String lit = operand;
+                            int litIndex = -1;
+                            for (int li=0; li<LITTAB.size(); li++) {
+                                if (LITTAB.get(li).lit.equals(lit)) { litIndex = li+1; break; }
+                            }
+                            if (litIndex == -1) {
+                                LITTAB.add(new LitEntry(lit));
+                                if (POOLTAB.isEmpty()) POOLTAB.add(1);
+                                litIndex = LITTAB.size();
+                            }
+                            sb.append(" (L,").append(litIndex).append(")");
+                        } else if (operand.matches("^[A-Za-z_]\\w*$")) {
+                            // symbol
+                            if (!SYMTAB.containsKey(operand)) SYMTAB.put(operand, new SymEntry(operand, null, SYMTAB.size()+1));
+                            sb.append(" (S,").append(SYMTAB.get(operand).index).append(")");
+                        } else {
+                            sb.append(" (C,").append(operand).append(")");
+                        }
+                    }
+                }
+                intermediate.add(sb.toString());
+                LC++;
+                continue;
+            }
+            // unknown op
+            intermediate.add(String.format("%03d  (??,%s)", LC, op));
+            LC++;
+        }
+
+        // After all lines, flush any remaining pool
+        if (!POOLTAB.isEmpty()) {
+            int poolStart = POOLTAB.get(POOLTAB.size()-1) - 1;
+            while (poolStart < LITTAB.size()) {
+                if (LITTAB.get(poolStart).addr == null) {
+                    LITTAB.get(poolStart).addr = LC++;
+                }
+                poolStart++;
+            }
+        }
+
+        // Print intermediate
+        System.out.println("=== Intermediate Code ===");
+        for (String s : intermediate) System.out.println(s);
+
+        // Print SYMTAB
+        System.out.println("\n=== SYMTAB ===");
+        System.out.printf("%5s %10s %7s%n","Index","Symbol","Address");
+        for (SymEntry se : SYMTAB.values()) {
+            System.out.printf("%5d %10s %7s%n", se.index, se.name, se.addr==null?"-":se.addr);
+        }
+
+        // Print LITTAB
+        System.out.println("\n=== LITTAB ===");
+        System.out.printf("%5s %10s %7s%n","Index","Literal","Address");
+        for (int i=0;i<LITTAB.size();i++) {
+            LitEntry le = LITTAB.get(i);
+            System.out.printf("%5d %10s %7s%n", i+1, le.lit, le.addr==null?"-":le.addr);
+        }
+
+        // Print POOLTAB
+        System.out.println("\n=== POOLTAB ===");
+        System.out.println("Pool starts at LITTAB indices: " + POOLTAB);
+    }
+
+    // evaluates expressions like "L1+3" or "NEXT+5" using SYMTAB values
+    static int evalExpr(String expr, Map<String, SymEntry> SYMTAB) {
+        expr = expr.trim();
+        Matcher m = Pattern.compile("^([A-Za-z_]\\w*)([+\\-]\\d+)?$").matcher(expr);
+        if (m.matches()) {
+            String sym = m.group(1);
+            String off = m.group(2);
+            Integer val = null;
+            if (SYMTAB.containsKey(sym)) val = SYMTAB.get(sym).addr;
+            if (val == null) {
+                // create entry if not present
+                if (!SYMTAB.containsKey(sym)) SYMTAB.put(sym, new SymEntry(sym, null, SYMTAB.size()+1));
+                val = 0; // assume 0 for now; was undefined
+            }
+            if (off != null) val += Integer.parseInt(off);
+            return val;
+        }
+        if (expr.matches("\\d+")) return Integer.parseInt(expr);
+        throw new RuntimeException("Unsupported expression: " + expr);
+    }
+}

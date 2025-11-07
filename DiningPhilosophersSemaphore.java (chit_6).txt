@@ -1,0 +1,38 @@
+// DiningPhilosophersSemaphore.java
+import java.util.concurrent.Semaphore;
+
+public class DiningPhilosophersSemaphore {
+    static final int N = 5;
+    static Semaphore[] forks = new Semaphore[N];
+    static Semaphore mutex = new Semaphore(1);
+
+    static class Philosopher extends Thread {
+        int i;
+        Philosopher(int i) { this.i = i; }
+        public void run() {
+            try {
+                for (int k = 0; k < 3; k++) {
+                    System.out.println("Philosopher-" + i + " thinking");
+                    Thread.sleep((int)(Math.random()*300));
+
+                    mutex.acquire();
+                    forks[i].acquire();
+                    forks[(i+1)%N].acquire();
+                    mutex.release();
+
+                    System.out.println("Philosopher-" + i + " eating");
+                    Thread.sleep((int)(Math.random()*200));
+
+                    forks[i].release();
+                    forks[(i+1)%N].release();
+                }
+                System.out.println("Philosopher-" + i + " finished");
+            } catch (InterruptedException e) {}
+        }
+    }
+
+    public static void main(String[] args) {
+        for (int i = 0; i < N; i++) forks[i] = new Semaphore(1);
+        for (int i = 0; i < N; i++) new Philosopher(i).start();
+    }
+}

@@ -1,0 +1,35 @@
+import java.util.*;
+
+public class FirstFitMemoryAllocation {
+    public static void main(String[] args) {
+        int[] memory = {100, 500, 200, 300, 600};   // Memory partitions (in KB)
+        int[] process = {212, 417, 112, 426};       // Process sizes (in KB)
+
+        firstFit(memory, process);
+    }
+
+    public static void firstFit(int[] memory, int[] process) {
+        int[] allocation = new int[process.length];  // stores block index for each process
+        Arrays.fill(allocation, -1); // initialize with -1 (not allocated)
+
+        // Allocate each process
+        for (int i = 0; i < process.length; i++) {
+            for (int j = 0; j < memory.length; j++) {
+                if (memory[j] >= process[i]) { // if block is big enough
+                    allocation[i] = j;
+                    memory[j] -= process[i];  // reduce memory size
+                    break; // move to next process
+                }
+            }
+        }
+
+        // Print results
+        System.out.println("Process No.\tProcess Size\tBlock No.\tRemaining Memory");
+        for (int i = 0; i < process.length; i++) {
+            if (allocation[i] != -1)
+                System.out.println((i + 1) + "\t\t" + process[i] + "\t\t" + (allocation[i] + 1) + "\t\t" + memory[allocation[i]]);
+            else
+                System.out.println((i + 1) + "\t\t" + process[i] + "\t\tNot Allocated\t---");
+        }
+    }
+}

@@ -1,0 +1,64 @@
+// ProducerConsumer.java
+import java.util.*;
+import java.util.concurrent.locks.*;
+
+public class ProducerConsumer {
+    static class BoundedBuffer {
+        private final LinkedList<String> buffer = new LinkedList<>();
+        private final int capacity;
+        private final Lock lock = new ReentrantLock();
+        private final Condition notFull = lock.newCondition();
+        private final Condition notEmpty = lock.newCondition();
+
+        BoundedBuffer(int capacity) { this.capacity = capacity; }
+
+        void produce(String item, int producerId) throws InterruptedException {
+            lock.lock();
+            try {
+                while (buffer.size() == capacity) notFull.await();
+                buffer.add(item);
+                System.out.printf("Producer-%d produced %s (size=%d)%n", producerId, item, buffer.size());
+                notEmpty.signal();
+            } finally { lock.unlock(); }
+        }
+
+        String consume(int consumerId) throws InterruptedException {
+            lock.lock();
+            try {
+                while (buffer.isEmpty()) notEmpty.await();
+                String item = buffer.removeFirst();
+                System.out.printf("Consumer-%d consumed %s (size=%d)%n", consumerId, item, buffer.size());
+                notFull.signal();
+                return item;
+            } finally { lock.unlock(); }
+        }
+    }
+
+    public static void main(String[] args) throws Exception {
+        BoundedBuffer bb = new BoundedBuffer(5);
+        Thread p1 = new Thread(() -> {
+            for (int i=0;i<10;i++) {
+                try { Thread.sleep((int)(Math.random()*200)); bb.produce("p1-"+i,1); } catch(Exception e){ }
+            }
+        });
+        Thread p2 = new Thread(() -> {
+            for (int i=0;i<10;i++) {
+                try { Thread.sleep((int)(Math.random()*200)); bb.produce("p2-"+i,2); } catch(Exception e){ }
+            }
+        });
+        Thread c1 = new Thread(() -> {
+            for (int i=0;i<10;i++) {
+                try { Thread.sleep((int)(Math.random()*300)); bb.consume(1); } catch(Exception e){ }
+            }
+        });
+        Thread c2 = new Thread(() -> {
+            for (int i=0;i<10;i++) {
+                try { Thread.sleep((int)(Math.random()*300)); bb.consume(2); } catch(Exception e){ }
+            }
+        });
+
+        Arrays.asList(p1,p2,c1,c2).forEach(Thread::start);
+        for (Thread t: Arrays.asList(p1,p2,c1,c2)) t.join();
+        System.out.println("Producer-Consumer finished");
+    }
+}

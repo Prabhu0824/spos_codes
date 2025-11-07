@@ -1,0 +1,58 @@
+// ReadersWritersSemaphore.java
+import java.util.concurrent.Semaphore;
+
+public class ReadersWritersSemaphore {
+    static Semaphore mutex = new Semaphore(1);
+    static Semaphore wrt = new Semaphore(1);
+    static int readCount = 0;
+
+    static class Reader extends Thread {
+        int id;
+        Reader(int id) { this.id = id; }
+        public void run() {
+            for (int i=0; i<3; i++) {
+                try {
+                    Thread.sleep((int)(Math.random()*500));
+                    mutex.acquire();
+                    readCount++;
+                    if (readCount == 1) wrt.acquire(); // first reader
+                    mutex.release();
+
+                    System.out.println("Reader-" + id + " reading...");
+                    Thread.sleep(500);
+
+                    mutex.acquire();
+                    readCount--;
+                    if (readCount == 0) wrt.release();
+                    mutex.release();
+                    System.out.println("Reader-" + id + " done.");
+                } catch (InterruptedException e) {}
+            }
+        }
+    }
+
+    static class Writer extends Thread {
+        int id;
+        Writer(int id) { this.id = id; }
+        public void run() {
+            for (int i=0; i<2; i++) {
+                try {
+                    Thread.sleep((int)(Math.random()*800));
+                    wrt.acquire();
+                    System.out.println("Writer-" + id + " writing...");
+                    Thread.sleep(800);
+                    System.out.println("Writer-" + id + " done.");
+                    wrt.release();
+                } catch (InterruptedException e) {}
+            }
+        }
+    }
+
+    public static void main(String[] args) throws Exception {
+        new Reader(1).start();
+        new Reader(2).start();
+        new Writer(1).start();
+        new Reader(3).start();
+        new Writer(2).start();
+    }
+}

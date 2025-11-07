@@ -1,0 +1,177 @@
+chit(3) code:
+
+import java.util.*;
+import java.util.regex.*;
+
+/**
+ * Pass1MacroProcessor.java
+ * A simple Pass-I for a two-pass macro processor in Java.
+ * Builds MNT, MDT, ALA and emits intermediate CALL records.
+ */
+public class Pass1MacroProcessor {
+
+    static class MNTEntry {
+        String name;
+        int nparams;
+        int mdtPtr;
+        MNTEntry(String n, int p, int ptr) { name = n; nparams = p; mdtPtr = ptr; }
+    }
+
+    static class MDTEntry {
+        int lineNo;
+        String text;
+        MDTEntry(int ln, String t) { lineNo = ln; text = t; }
+    }
+
+    // split arguments like "&A, &B" -> ["&A","&B"]
+    static List<String> splitArgs(String s) {
+        String[] parts = s.split(",");
+        List<String> res = new ArrayList<>();
+        for (String p : parts) {
+            String t = p.trim();
+            if (!t.isEmpty()) res.add(t);
+        }
+        return res;
+    }
+
+    // replace formals in a line with (P,k)
+    static String replaceFormals(String line, List<String> formals) {
+        // We'll match core words possibly surrounded by punctuation.
+        StringBuilder sb = new StringBuilder();
+        Matcher m = Pattern.compile("(\\s+|,|[^\\s,]+)").matcher(line);
+        while (m.find()) {
+            String tok = m.group();
+            if (tok.trim().isEmpty() || tok.equals(",")) {
+                sb.append(tok);
+                continue;
+            }
+            // extract leading/trailing punctuation
+            Matcher mm1 = Pattern.compile("^([^A-Za-z0-9&]*)(.*)").matcher(tok);
+            String leading = "";
+            String rest = tok;
+            if (mm1.find()) { leading = mm1.group(1); rest = mm1.group(2); }
+            Matcher mm2 = Pattern.compile("^(.*?)([^A-Za-z0-9&]*)$").matcher(rest);
+            String core = rest;
+            String trailing = "";
+            if (mm2.find()) { core = mm2.group(1); trailing = mm2.group(2); }
+            boolean replaced = false;
+            for (int i = 0; i < formals.size(); i++) {
+                if (core.equals(formals.get(i))) {
+                    core = "(P," + (i+1) + ")";
+                    replaced = true;
+                    break;
+                }
+            }
+            sb.append(leading).append(core).append(trailing);
+        }
+        return sb.toString();
+    }
+
+    public static void main(String[] args) {
+        String source =
+            "START\n" +
+            "MACRO\n" +
+            "INCR &ARG1, &ARG2\n" +
+            "ADD AREG, &AREG2\n" +
+            "MEND\n" +
+            "MACRO\n" +
+            "DECR &ARG3, &ARG4\n" +
+            "SUB AREG, &AREG3\n" +
+            "MOVER CREG, &ARG4\n" +
+            "MEND\n" +
+            "INCR N1, N2\n" +
+            "DECR N3,N4\n" +
+            "END\n";
+
+        String[] lines = source.split("\\r?\\n");
+        List<MNTEntry> MNT = new ArrayList<>();
+        List<MDTEntry> MDT = new ArrayList<>();
+        Map<String, List<String>> ALA = new LinkedHashMap<>();
+        List<Map<String,Object>> intermediate = new ArrayList<>();
+
+        int i = 0;
+        int mdtLineNo = 1;
+        while (i < lines.length) {
+            String line = lines[i].trim();
+            if (line.isEmpty()) { i++; continue; }
+            if (line.equalsIgnoreCase("MACRO")) {
+                i++;
+                if (i >= lines.length) { throw new RuntimeException("Unexpected EOF after MACRO"); }
+                String header = lines[i].trim();
+                String[] hdrParts = header.split("\\s+", 2);
+                String macroName = hdrParts[0];
+                List<String> formals = new ArrayList<>();
+                if (hdrParts.length > 1) formals = splitArgs(hdrParts[1]);
+                MNT.add(new MNTEntry(macroName, formals.size(), mdtLineNo));
+                ALA.put(macroName, new ArrayList<>(formals));
+                i++;
+                while (i < lines.length) {
+                    String bodyLine = lines[i].trim();
+                    if (bodyLine.equalsIgnoreCase("MEND")) {
+                        MDT.add(new MDTEntry(mdtLineNo, "MEND"));
+                        mdtLineNo++;
+                        i++;
+                        break;
+                    }
+                    String transformed = replaceFormals(lines[i], formals);
+                    MDT.add(new MDTEntry(mdtLineNo, transformed));
+                    mdtLineNo++;
+                    i++;
+                }
+                continue;
+            } else {
+                String[] parts = line.split("\\s+", 2);
+                String first = parts[0];
+                int mntIndex = -1;
+                for (int idx = 0; idx < MNT.size(); idx++) {
+                    if (MNT.get(idx).name.equals(first)) { mntIndex = idx + 1; break; }
+                }
+                if (mntIndex != -1) {
+                    List<String> actuals = new ArrayList<>();
+                    if (parts.length > 1) actuals = splitArgs(parts[1]);
+                    Map<String,Object> rec = new LinkedHashMap<>();
+                    rec.put("type", "CALL");
+                    rec.put("mnt_index", mntIndex);
+                    rec.put("macro_name", first);
+                    rec.put("actuals", actuals);
+                    intermediate.add(rec);
+                } else {
+                    Map<String,Object> rec = new LinkedHashMap<>();
+                    rec.put("type", "LINE");
+                    rec.put("text", line);
+                    intermediate.add(rec);
+                }
+                i++;
+            }
+        }
+
+        // Print results
+        System.out.println("=== MNT (Macro Name Table) ===");
+        System.out.printf("%5s  %-10s  %7s  %7s%n", "Index", "Name", "#Params", "MDT_Ptr");
+        for (int idx = 0; idx < MNT.size(); idx++) {
+            MNTEntry e = MNT.get(idx);
+            System.out.printf("%5d  %-10s  %7d  %7d%n", idx+1, e.name, e.nparams, e.mdtPtr);
+        }
+
+        System.out.println("\n=== MDT (Macro Definition Table) ===");
+        System.out.printf("%5s  %s%n", "Line#", "Text");
+        for (MDTEntry e : MDT) {
+            System.out.printf("%5d  %s%n", e.lineNo, e.text);
+        }
+
+        System.out.println("\n=== ALA (Argument List Array) ===");
+        for (Map.Entry<String, List<String>> en : ALA.entrySet()) {
+            System.out.println(en.getKey() + ": " + en.getValue());
+        }
+
+        System.out.println("\n=== Intermediate File (Pass-I Output) ===");
+        for (Map<String,Object> rec : intermediate) {
+            if (rec.get("type").equals("LINE")) {
+                System.out.println(rec.get("text"));
+            } else {
+                System.out.printf("CALL  MNT_index=%d  macro=%s  actuals=%s%n",
+                    rec.get("mnt_index"), rec.get("macro_name"), rec.get("actuals").toString());
+            }
+        }
+    }
+}

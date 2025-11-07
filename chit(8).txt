@@ -1,0 +1,91 @@
+import java.util.*;
+
+public class Main {
+    static class Process {
+        String pid;
+        int arrival, burst, remaining, start = -1, completion, turnaround, waiting;
+
+        Process(String pid, int arrival, int burst) {
+            this.pid = pid;
+            this.arrival = arrival;
+            this.burst = burst;
+            this.remaining = burst;
+        }
+    }
+
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        System.out.print("Enter number of processes: ");
+        int n = sc.nextInt();
+        List<Process> processes = new ArrayList<>();
+
+        for (int i = 0; i < n; i++) {
+            System.out.print("Enter Process ID, Arrival Time, and Burst Time: ");
+            String pid = sc.next();
+            int arrival = sc.nextInt();
+            int burst = sc.nextInt();
+            processes.add(new Process(pid, arrival, burst));
+        }
+
+        List<String> gantt = new ArrayList<>();
+        int completed = 0, time = 0;
+        double totalTAT = 0, totalWT = 0;
+
+        while (completed < n) {
+            Process current = null;
+            int minRemaining = Integer.MAX_VALUE;
+
+            // Find the process with the smallest remaining time among arrived processes
+            for (Process p : processes) {
+                if (p.arrival <= time && p.remaining > 0 && p.remaining < minRemaining) {
+                    minRemaining = p.remaining;
+                    current = p;
+                }
+            }
+
+            if (current == null) {
+                time++; // CPU idle
+                gantt.add("Idle");
+                continue;
+            }
+
+            if (current.start == -1) current.start = time;
+
+            current.remaining--;
+            gantt.add(current.pid);
+            time++;
+
+            if (current.remaining == 0) {
+                current.completion = time;
+                current.turnaround = current.completion - current.arrival;
+                current.waiting = current.turnaround - current.burst;
+                totalTAT += current.turnaround;
+                totalWT += current.waiting;
+                completed++;
+            }
+        }
+
+        // Display results
+        System.out.println("\nPID\tArrival\tBurst\tStart\tCompletion\tTurnaround\tWaiting");
+        for (Process p : processes) {
+            System.out.printf("%s\t%d\t%d\t%d\t%d\t\t%d\t\t%d%n",
+                    p.pid, p.arrival, p.burst, p.start, p.completion, p.turnaround, p.waiting);
+        }
+
+        System.out.printf("%nAverage Turnaround Time: %.2f%n", totalTAT / n);
+        System.out.printf("Average Waiting Time: %.2f%n", totalWT / n);
+
+        // Gantt Chart
+        System.out.println("\nGantt Chart:");
+        String last = "";
+        System.out.print("0");
+        for (int i = 0; i < gantt.size(); i++) {
+            String current = gantt.get(i);
+            if (!current.equals(last)) {
+                System.out.print(" | " + current);
+                last = current;
+            }
+        }
+        System.out.println(" | " + time);
+    }
+}

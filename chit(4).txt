@@ -1,0 +1,74 @@
+import java.util.*;
+
+public class MacroPass2 {
+    public static void main(String[] args) {
+        List<String> MDT = Arrays.asList(
+            "INCR &ARG1, &ARG2",
+            "MOVER AREG, &ARG1",
+            "ADD AREG, &ARG2",
+            "MEND",
+            "DECR &ARG3, &ARG4",
+            "MOVER AREG, &ARG3",
+            "SUB AREG, &ARG4",
+            "MEND"
+        );
+
+        Map<String, Integer> MNT = Map.of(
+            "INCR", 0,
+            "DECR", 4
+        );
+
+        Map<String, List<String>> ALA = new HashMap<>();
+        ALA.put("INCR", Arrays.asList("&ARG1", "&ARG2"));
+        ALA.put("DECR", Arrays.asList("&ARG3", "&ARG4"));
+
+        List<String> intermediate = Arrays.asList(
+            "START",
+            "INCR N1, N2",
+            "DECR N3, N4",
+            "END"
+        );
+
+        List<String> expanded = new ArrayList<>();
+
+        for (String line : intermediate) {
+            String[] parts = line.trim().split("\\s+");
+            if (parts.length == 0) continue;
+            String macro = parts[0];
+
+            // Non-macro line
+            if (!MNT.containsKey(macro)) {
+                expanded.add(line);
+                continue;
+            }
+
+            // --- Macro Expansion ---
+            String[] actualArgs = {};
+            if (parts.length > 1) {
+                actualArgs = parts[1].split(",");
+            }
+
+            int mdtIndex = MNT.get(macro);
+            List<String> formals = ALA.get(macro);
+            Map<String, String> argMap = new HashMap<>();
+
+            for (int i = 0; i < formals.size(); i++) {
+                String actual = (i < actualArgs.length) ? actualArgs[i].trim() : "";
+                argMap.put(formals.get(i), actual);
+            }
+
+            int i = mdtIndex + 1;
+            while (!MDT.get(i).equals("MEND")) {
+                String expandedLine = MDT.get(i);
+                for (var e : argMap.entrySet())
+                    expandedLine = expandedLine.replace(e.getKey(), e.getValue());
+                expanded.add(expandedLine);
+                i++;
+            }
+        }
+
+        System.out.println("=== FINAL EXPANDED CODE ===");
+        for (String s : expanded)
+            System.out.println(s);
+    }
+}
