@@ -1,0 +1,412 @@
+1️⃣ Pass-I of Two Pass Assembler
+
+Objective:
+To implement Pass-I of a two-pass assembler to generate intermediate code and symbol/literal tables.
+
+Algorithm:
+
+Initialize LC (Location Counter) to the starting address.
+
+Read one line at a time from the source program.
+
+If mnemonic is START, initialize LC.
+
+If it’s a label, enter label and LC into SYMTAB.
+
+If operand is a literal, add it to LITTAB.
+
+If directive is LTORG or END,
+
+Assign addresses to literals from LITTAB.
+
+Update POOLTAB.
+
+Generate Intermediate Code (IC) for each instruction.
+
+Increment LC appropriately.
+
+Stop when END directive is reached.
+
+Output: SYMTAB, LITTAB, POOLTAB, IC.
+
+2️⃣ Pass-II of Two Pass Assembler
+
+Objective:
+To generate final machine code using intermediate code and symbol/literal tables.
+
+Algorithm:
+
+Read the Intermediate Code, SYMTAB, and LITTAB.
+
+For each instruction in IC:
+
+Find opcode from OPTAB.
+
+Replace symbolic operands using SYMTAB or LITTAB.
+
+Generate Machine Code for each instruction.
+
+Print the object code.
+
+Stop.
+
+3️⃣ Pass-I of Macro Processor
+
+Objective:
+To process macro definitions and create macro tables.
+
+Algorithm:
+
+Initialize MNT, MDT, and ALA.
+
+Read the source line by line.
+
+If line has MACRO,
+
+Store macro name in MNT with current MDT index.
+
+Read macro definition lines until MEND.
+
+Store each line in MDT.
+
+Update ALA for parameters.
+
+If not a macro definition, copy to intermediate file.
+
+Repeat until end of source file.
+
+Output: MNT, MDT, ALA.
+
+4️⃣ Pass-II of Macro Processor
+
+Objective:
+To expand macro calls using definitions from Pass-I.
+
+Algorithm:
+
+Read MNT, MDT, and ALA from Pass-I.
+
+Read source code line by line.
+
+If macro call found in MNT:
+
+Retrieve its MDT index.
+
+Substitute actual arguments using ALA.
+
+Expand macro body (from MDT).
+
+If normal instruction, copy as is.
+
+Continue until end.
+
+Output: expanded source file.
+
+5️⃣ Process Synchronization Using Mutex
+
+Objective:
+To solve a critical section problem using a mutex lock.
+
+Algorithm:
+
+Initialize mutex = 1.
+
+For each process:
+
+Wait until mutex == 1.
+
+Set mutex = 0 (enter critical section).
+
+Execute critical section.
+
+Set mutex = 1 (exit critical section).
+
+Repeat for all processes.
+
+Ensure no two processes are in the critical section at the same time.
+
+6️⃣ Process Synchronization Using Semaphore
+
+Objective:
+To solve synchronization problem using semaphores (e.g., producer-consumer).
+
+Algorithm:
+
+Initialize semaphores:
+
+mutex = 1, full = 0, empty = n (buffer size).
+
+Producer Process:
+
+Wait(empty)
+
+Wait(mutex)
+
+Produce item and add to buffer
+
+Signal(mutex)
+
+Signal(full)
+
+Consumer Process:
+
+Wait(full)
+
+Wait(mutex)
+
+Consume item from buffer
+
+Signal(mutex)
+
+Signal(empty)
+
+Repeat for multiple producers/consumers.
+
+7️⃣ CPU Scheduling – FCFS
+
+Objective:
+To simulate First Come First Serve CPU scheduling algorithm.
+
+Algorithm:
+
+Input number of processes and their Arrival Time and Burst Time.
+
+Sort processes by Arrival Time.
+
+For each process:
+
+Start time = max(previous Completion, Arrival time)
+
+Completion time = Start time + Burst time
+
+Turnaround time = Completion - Arrival
+
+Waiting time = Turnaround - Burst
+
+Calculate average waiting and turnaround time.
+
+Display Gantt chart.
+
+8️⃣ CPU Scheduling – SJF (Preemptive / SRTF)
+
+Objective:
+To implement Shortest Job First (Preemptive) scheduling.
+
+Algorithm:
+
+Input processes with Arrival and Burst Time.
+
+At each time unit, select the process with the smallest remaining time among arrived processes.
+
+Execute that process for one unit.
+
+Update remaining time.
+
+If a process finishes, record Completion, Turnaround, Waiting times.
+
+Continue until all processes are done.
+
+Calculate average times.
+
+9️⃣ CPU Scheduling – Priority (Non-Preemptive)
+
+Objective:
+To implement Priority Scheduling (lowest number = highest priority).
+
+Algorithm:
+
+Input processes with Arrival, Burst, and Priority.
+
+Sort by Arrival Time.
+
+Among arrived processes, select the one with highest priority.
+
+Execute it completely.
+
+Record Completion, Turnaround, and Waiting times.
+
+Repeat for all processes.
+
+Compute averages.
+
+🔟 CPU Scheduling – Round Robin (Preemptive)
+
+Objective:
+To simulate Round Robin scheduling with a fixed time quantum.
+
+Algorithm:
+
+Input processes with Arrival, Burst Time, and Time Quantum.
+
+Maintain Ready Queue.
+
+Start with first process, execute for Time Quantum or until completion.
+
+If not finished, add process back to Ready Queue.
+
+Add newly arrived processes during execution.
+
+Continue until all processes complete.
+
+Calculate Waiting and Turnaround times.
+
+1️⃣1️⃣ Memory Allocation – Best Fit
+
+Objective:
+To allocate memory blocks using Best Fit strategy.
+
+Algorithm:
+
+Input process sizes and memory block sizes.
+
+For each process:
+
+Search all blocks.
+
+Choose the smallest block that fits.
+
+Allocate process to that block.
+
+Mark block as occupied.
+
+Print allocation status.
+
+Calculate internal and external fragmentation.
+
+1️⃣2️⃣ Memory Allocation – First Fit
+
+Objective:
+To allocate memory using First Fit strategy.
+
+Algorithm:
+
+Input process sizes and block sizes.
+
+For each process:
+
+Scan memory from the beginning.
+
+Allocate the first available block that fits.
+
+Mark block as occupied.
+
+Print memory allocation table.
+
+Show remaining memory.
+
+1️⃣3️⃣ Memory Allocation – Next Fit
+
+Objective:
+To allocate memory using Next Fit strategy.
+
+Algorithm:
+
+Input process and block sizes.
+
+Keep a pointer to the last allocated block.
+
+For each process:
+
+Search from the last allocated block onward (circularly).
+
+Allocate first suitable block.
+
+Update the pointer.
+
+Print allocations.
+
+1️⃣4️⃣ Memory Allocation – Worst Fit
+
+Objective:
+To allocate memory using Worst Fit strategy.
+
+Algorithm:
+
+Input process and block sizes.
+
+For each process:
+
+Find the largest available block that fits.
+
+Allocate it.
+
+Mark the block as occupied.
+
+Display allocation details.
+
+Calculate unused memory.
+
+1️⃣5️⃣ Page Replacement – FIFO
+
+Objective:
+To implement FIFO page replacement algorithm.
+
+Algorithm:
+
+Input reference string and number of frames.
+
+Initialize empty queue for frames.
+
+For each page in reference string:
+
+If page in queue → no page fault.
+
+Else → page fault.
+
+If queue full → remove first page.
+
+Insert new page at end.
+
+Count total page faults.
+
+Display page table after each reference.
+
+1️⃣6️⃣ Page Replacement – Optimal
+
+Objective:
+To implement Optimal page replacement algorithm.
+
+Algorithm:
+
+Input reference string and number of frames.
+
+For each page:
+
+If not in frame:
+
+If frame not full → add it.
+
+Else → find page in frame whose next use is farthest in future.
+
+Replace that page.
+
+Else → continue.
+
+Count page faults.
+
+Display frame status after each reference.
+
+1️⃣7️⃣ Page Replacement – LRU
+
+Objective:
+To implement Least Recently Used (LRU) page replacement algorithm.
+
+Algorithm:
+
+Input reference string and frame size.
+
+Maintain list of pages with their last used time.
+
+For each page reference:
+
+If page in frame → update last used time.
+
+Else (page fault):
+
+If frame not full → add it.
+
+Else → replace page with least recent use.
+
+Update usage time each time page is accessed.
+
+Count and display total page faults.
